@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放物線の軌跡</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        canvas {
+            border: 1px solid #ddd;
+        }
+
+        form {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input {
+            padding: 5px;
+        }
+
+        button {
+            padding: 7px;
+            background-color: #4caf50;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        #result p {
+            margin: 5px;
+            font-size: 16px;
+        }
+
+        span {
+            font-weight: bold;
+            color: #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="parabolaCanvas" width="1500" height="400"></canvas>
+    <form>
+        <label for="initialVelocity">初速度:</label>
+        <input type="number" id="initialVelocity" value="10">
+
+        <label for="acceleration">加速度:</label>
+        <input type="number" id="acceleration" value="0.1">
+
+        <label for="angle">角度 (度数法):</label>
+        <input type="number" id="angle" value="45">
+
+        <button type="button" onclick="startAnimation()">アニメーション開始</button>
+    </form>
+
+    <div id="result">
+        <p>弾着距離: <span id="range">---</span></p>
+        <p>弾着時間: <span id="time">---</span></p>
+        <p>最高速度: <span id="maxSpeed">---</span></p>
+        <p>最高高度: <span id="maxHeight">---</span></p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('parabolaCanvas');
+        const context = canvas.getContext('2d');
+        const resultRange = document.getElementById('range');
+        const resultTime = document.getElementById('time');
+        const resultMaxSpeed = document.getElementById('maxSpeed');
+        const resultMaxHeight = document.getElementById('maxHeight');
+
+        const HEIGHT_INTERVAL = 10; // 高さを表示する間隔
+
+        class Parabola {
+            constructor(x, y, initialVelocity, acceleration, angle, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = 5;
+                this.initialVelocity = initialVelocity;
+                this.velocity = {
+                    x: initialVelocity * Math.cos((angle * Math.PI) / 180),
+                    y: -initialVelocity * Math.sin((angle * Math.PI) / 180)
+                };
+                this.acceleration = acceleration;
+                this.trajectory = [];
+                this.time = 0;
+                this.maxSpeed = 0;
+                this.maxHeight = 0;
+                this.isRunning = true;
+            }
+
+            draw() {
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                context.fillStyle = this.color;
+                context.fill();
+                context.closePath();
+            }
+
+            update() {
+                if (this.isRunning) {
+                    this.x += this.velocity.x;
+                    this.y += this.velocity.y;
+                    this.velocity.y += this.acceleration;
+                    this.trajectory.push({ x: this.x, y: this.y });
+                    this.draw();
+                    this.time += 1 / 60; // 1フレームごとに経過時間を更新
+
+                    if (this.y >= canvas.height) {
+                        this.isRunning = false;
+                        this.calculateResults();
+                    }
+                }
+            }
+
+            drawTrajectory() {
+                context.beginPath();
+                context.moveTo(this.trajectory[0].x, this.trajectory[0].y);
+
+                for (let i = 1; i < this.trajectory.length; i++) {
+                    context.lineTo(this.trajectory[i].x, this.trajectory[i].y);
+                }
+
+                context.strokeStyle = this.color;
+                context.stroke();
+                context.closePath();
+            }
+
+            drawHeightMarkers() {
+                for (let height = 0; height <= canvas.height; height += HEIGHT_INTERVAL) {
+                    context.beginPath();
+                    context.moveTo(0, height);
+                    context.lineTo(10, height);
+                    context.stroke();
+                    context.fillText(height.toString(), 15, height);
+                    context.closePath();
+                }
+            }
+
+            calculateResults() {
+                // 弾着距離
+                const range = this.trajectory[this.trajectory.length - 1].x;
+                resultRange.textContent = range.toFixed(2);
+
+                // 弾着時間
+                resultTime.textContent = this.time.toFixed(2);
+
+                // 最高速度
+                this.maxSpeed = Math.max(...this.trajectory.map(point => Math.sqrt(point.x ** 2 + point.y ** 2)));
+                resultMaxSpeed.textContent = this.maxSpeed.toFixed(2);
+
+                // 最高高度
+                this.maxHeight = Math.max(...this.trajectory.map(point => point.y));
+                resultMaxHeight.textContent = this.maxHeight.toFixed(2);
+            }
+        }
+
+        let parabola;
+
+        function draw() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (parabola) {
+                parabola.drawHeightMarkers();
+                parabola.update();
+                parabola.drawTrajectory();
+
+                if (parabola.isRunning) {
+                    requestAnimationFrame(draw);
+                } else {
+                    parabola.calculateResults();
+                    parabola = null;
+                }
+            }
+        }
+
+        function startAnimation() {
+            const initialVelocity = parseFloat(document.getElementById('initialVelocity').value);
+            const acceleration = parseFloat(document.getElementById('acceleration').value);
+            const angle = parseFloat(document.getElementById('angle').value);
+
+            const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+
+            parabola = new Parabola(0, canvas.height, initialVelocity, acceleration, angle, randomColor);
+
+            draw();
+        }
+    </script>
+</body>
+</html>
